@@ -9,16 +9,18 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
-interface MeshPreviewProps {
-  file: File | null;
+interface DualMeshPreviewProps {
+  file1: File | null;
+  file2: File | null;
 }
 
-const MeshPreview: React.FC<MeshPreviewProps> = ({ file }) => {
-  const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
+const DualMeshPreview: React.FC<DualMeshPreviewProps> = ({ file1, file2 }) => {
+  const [geometry1, setGeometry1] = useState<THREE.BufferGeometry | null>(null);
+  const [geometry2, setGeometry2] = useState<THREE.BufferGeometry | null>(null);
 
   React.useEffect(() => {
-    if (!file) {
-      setGeometry(null);
+    if (!file1) {
+      setGeometry1(null);
       return;
     }
 
@@ -31,35 +33,68 @@ const MeshPreview: React.FC<MeshPreviewProps> = ({ file }) => {
         const geometry = loader.parse(arrayBuffer);
         geometry.computeBoundingBox();
         geometry.center();
-        setGeometry(geometry);
+        setGeometry1(geometry);
       }
     };
     
-    reader.readAsArrayBuffer(file);
-  }, [file]);
+    reader.readAsArrayBuffer(file1);
+  }, [file1]);
 
-  if (!geometry) {
+  React.useEffect(() => {
+    if (!file2) {
+      setGeometry2(null);
+      return;
+    }
+
+    const loader = new STLLoader();
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const arrayBuffer = event.target.result as ArrayBuffer;
+        const geometry = loader.parse(arrayBuffer);
+        geometry.computeBoundingBox();
+        geometry.center();
+        setGeometry2(geometry);
+      }
+    };
+    
+    reader.readAsArrayBuffer(file2);
+  }, [file2]);
+
+  if (!geometry1 && !geometry2) {
     return (
-      <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
-        <span className="text-gray-500">No preview available</span>
+      <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
+        <span className="text-gray-500">Upload files to see preview</span>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-32 bg-gray-900 rounded-lg overflow-hidden">
-      <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
+    <div className="w-full h-64 bg-gray-900 rounded-lg overflow-hidden">
+      <Canvas camera={{ position: [0, 0, 8], fov: 50 }}>
         <ambientLight intensity={0.6} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
-        <mesh geometry={geometry}>
-          <meshStandardMaterial color="#3b82f6" />
-        </mesh>
+        <directionalLight position={[-10, -10, -5]} intensity={0.5} />
+        
+        {geometry1 && (
+          <mesh geometry={geometry1} position={[-3, 0, 0]}>
+            <meshStandardMaterial color="#3b82f6" side={THREE.DoubleSide} />
+          </mesh>
+        )}
+        
+        {geometry2 && (
+          <mesh geometry={geometry2} position={[3, 0, 0]}>
+            <meshStandardMaterial color="#10b981" side={THREE.DoubleSide} />
+          </mesh>
+        )}
+        
         <OrbitControls 
           enableZoom={true} 
           enablePan={true} 
           enableRotate={true}
           maxDistance={20}
-          minDistance={1}
+          minDistance={2}
         />
       </Canvas>
     </div>
@@ -70,9 +105,10 @@ interface FileUploadProps {
   title: string;
   file: File | null;
   onFileChange: (file: File | null) => void;
+  color: string;
 }
 
-const FileUploadSection: React.FC<FileUploadProps> = ({ title, file, onFileChange }) => {
+const FileUploadSection: React.FC<FileUploadProps> = ({ title, file, onFileChange, color }) => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const droppedFile = e.dataTransfer.files[0];
@@ -91,6 +127,7 @@ const FileUploadSection: React.FC<FileUploadProps> = ({ title, file, onFileChang
   return (
     <Card className="p-6 space-y-4">
       <h3 className="text-xl font-semibold flex items-center gap-2">
+        <div className={`w-4 h-4 rounded ${color}`}></div>
         <FileText className="h-5 w-5" />
         {title}
       </h3>
@@ -116,16 +153,6 @@ const FileUploadSection: React.FC<FileUploadProps> = ({ title, file, onFileChang
           onChange={handleFileInput}
         />
       </div>
-
-      {file && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Eye className="h-4 w-4" />
-            Preview (scroll to zoom, drag to rotate/pan):
-          </div>
-          <MeshPreview file={file} />
-        </div>
-      )}
     </Card>
   );
 };
@@ -138,15 +165,14 @@ const Upload: React.FC = () => {
   const handleSubmit = async () => {
     if (file1 && file2) {
       try {
-        // Convert files to ArrayBuffer for more efficient storage
+        // Convert files to ArrayBuffer for passing to viewer
         const arrayBuffer1 = await file1.arrayBuffer();
         const arrayBuffer2 = await file2.arrayBuffer();
         
-        // Store as base64 but with compression-friendly approach
+        // Store as base64 in sessionStorage (temporary solution)
         const base64_1 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer1)));
-        const base64_2 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer2)));
+        const base64_2 = btoa(String.fromCharArray(...new Uint8Array(arrayBuffer2)));
         
-        // Store in sessionStorage instead of localStorage for temporary storage
         sessionStorage.setItem('mesh1', base64_1);
         sessionStorage.setItem('mesh2', base64_2);
         sessionStorage.setItem('mesh1Name', file1.name);
@@ -155,15 +181,14 @@ const Upload: React.FC = () => {
         navigate('/viewer');
       } catch (error) {
         console.error('Error processing files:', error);
-        // Fallback: try to store files in a more memory-efficient way
-        alert('Files are too large for browser storage. Please use smaller STL files.');
+        alert('Error processing files. Please try again.');
       }
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8">
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold text-gray-900">STL Mesh Viewer</h1>
           <p className="text-lg text-gray-600">Upload your STL files to visualize them in 3D</p>
@@ -174,13 +199,37 @@ const Upload: React.FC = () => {
             title="Mesh File 1"
             file={file1}
             onFileChange={setFile1}
+            color="bg-blue-500"
           />
           <FileUploadSection
             title="Mesh File 2"
             file={file2}
             onFileChange={setFile2}
+            color="bg-green-500"
           />
         </div>
+
+        {(file1 || file2) && (
+          <Card className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-lg font-semibold">
+                <Eye className="h-5 w-5" />
+                Preview (scroll to zoom, drag to rotate/pan)
+              </div>
+              <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                  <span>{file1?.name || 'No file selected'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-500 rounded"></div>
+                  <span>{file2?.name || 'No file selected'}</span>
+                </div>
+              </div>
+              <DualMeshPreview file1={file1} file2={file2} />
+            </div>
+          </Card>
+        )}
 
         <div className="text-center">
           <Button
