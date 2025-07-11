@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
@@ -8,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Eye, EyeOff, Settings } from 'lucide-react';
 import * as THREE from 'three';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
 interface MeshComponentProps {
   data: string;
