@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Upload as UploadIcon, Eye, FileText, ArrowRight } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, STLLoader } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 
 interface MeshPreviewProps {
   file: File | null;
@@ -21,7 +22,7 @@ const MeshPreview: React.FC<MeshPreviewProps> = ({ file }) => {
       return;
     }
 
-    const loader = new THREE.STLLoader();
+    const loader = new STLLoader();
     const reader = new FileReader();
     
     reader.onload = (event) => {

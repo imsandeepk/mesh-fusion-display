@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Eye, EyeOff, Settings } from 'lucide-react';
 import * as THREE from 'three';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 
 interface MeshComponentProps {
   data: string;
@@ -23,7 +24,7 @@ const MeshComponent: React.FC<MeshComponentProps> = ({ data, color, visible, pos
     if (!data) return;
 
     try {
-      const loader = new THREE.STLLoader();
+      const loader = new STLLoader();
       // Convert data URL back to ArrayBuffer
       const base64 = data.split(',')[1];
       const binaryString = window.atob(base64);
