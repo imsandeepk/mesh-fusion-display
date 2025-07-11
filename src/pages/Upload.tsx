@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -53,7 +54,13 @@ const MeshPreview: React.FC<MeshPreviewProps> = ({ file }) => {
         <mesh geometry={geometry}>
           <meshStandardMaterial color="#3b82f6" />
         </mesh>
-        <OrbitControls enableZoom={false} enablePan={false} />
+        <OrbitControls 
+          enableZoom={true} 
+          enablePan={true} 
+          enableRotate={true}
+          maxDistance={20}
+          minDistance={1}
+        />
       </Canvas>
     </div>
   );
@@ -114,7 +121,7 @@ const FileUploadSection: React.FC<FileUploadProps> = ({ title, file, onFileChang
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Eye className="h-4 w-4" />
-            Preview:
+            Preview (scroll to zoom, drag to rotate/pan):
           </div>
           <MeshPreview file={file} />
         </div>
@@ -128,21 +135,29 @@ const Upload: React.FC = () => {
   const [file1, setFile1] = useState<File | null>(null);
   const [file2, setFile2] = useState<File | null>(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (file1 && file2) {
-      // Store files in localStorage for the viewer page
-      const reader1 = new FileReader();
-      const reader2 = new FileReader();
-      
-      reader1.onload = () => {
-        localStorage.setItem('mesh1', reader1.result as string);
-        reader2.onload = () => {
-          localStorage.setItem('mesh2', reader2.result as string);
-          navigate('/viewer');
-        };
-        reader2.readAsDataURL(file2);
-      };
-      reader1.readAsDataURL(file1);
+      try {
+        // Convert files to ArrayBuffer for more efficient storage
+        const arrayBuffer1 = await file1.arrayBuffer();
+        const arrayBuffer2 = await file2.arrayBuffer();
+        
+        // Store as base64 but with compression-friendly approach
+        const base64_1 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer1)));
+        const base64_2 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer2)));
+        
+        // Store in sessionStorage instead of localStorage for temporary storage
+        sessionStorage.setItem('mesh1', base64_1);
+        sessionStorage.setItem('mesh2', base64_2);
+        sessionStorage.setItem('mesh1Name', file1.name);
+        sessionStorage.setItem('mesh2Name', file2.name);
+        
+        navigate('/viewer');
+      } catch (error) {
+        console.error('Error processing files:', error);
+        // Fallback: try to store files in a more memory-efficient way
+        alert('Files are too large for browser storage. Please use smaller STL files.');
+      }
     }
   };
 

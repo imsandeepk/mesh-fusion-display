@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
@@ -24,9 +25,8 @@ const MeshComponent: React.FC<MeshComponentProps> = ({ data, color, visible, pos
 
     try {
       const loader = new STLLoader();
-      // Convert data URL back to ArrayBuffer
-      const base64 = data.split(',')[1];
-      const binaryString = window.atob(base64);
+      // Convert base64 back to ArrayBuffer
+      const binaryString = atob(data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
@@ -83,8 +83,8 @@ const Viewer: React.FC = () => {
   ] as [number, number, number][];
 
   useEffect(() => {
-    const mesh1 = localStorage.getItem('mesh1');
-    const mesh2 = localStorage.getItem('mesh2');
+    const mesh1 = sessionStorage.getItem('mesh1');
+    const mesh2 = sessionStorage.getItem('mesh2');
     
     if (!mesh1 || !mesh2) {
       navigate('/');
@@ -96,8 +96,10 @@ const Viewer: React.FC = () => {
   }, [navigate]);
 
   const handleBackToUpload = () => {
-    localStorage.removeItem('mesh1');
-    localStorage.removeItem('mesh2');
+    sessionStorage.removeItem('mesh1');
+    sessionStorage.removeItem('mesh2');
+    sessionStorage.removeItem('mesh1Name');
+    sessionStorage.removeItem('mesh2Name');
     navigate('/');
   };
 
