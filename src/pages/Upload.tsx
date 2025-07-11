@@ -15,23 +15,17 @@ const Upload: React.FC = () => {
   const handleSubmit = async () => {
     if (file1 && file2) {
       try {
-        // Convert files to base64 for storage
-        const arrayBuffer1 = await file1.arrayBuffer();
-        const arrayBuffer2 = await file2.arrayBuffer();
-        
-        const base64_1 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer1)));
-        const base64_2 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer2)));
-        
-        // Store in sessionStorage
-        sessionStorage.setItem('mesh1', base64_1);
-        sessionStorage.setItem('mesh2', base64_2);
-        sessionStorage.setItem('mesh1Name', file1.name);
-        sessionStorage.setItem('mesh2Name', file2.name);
-        
-        console.log('Files stored in sessionStorage, navigating to viewer...');
-        navigate('/viewer');
+        console.log('Navigating to viewer with files:', file1.name, file2.name);
+        navigate('/viewer', {
+          state: {
+            file1: file1,
+            file2: file2,
+            mesh1Name: file1.name,
+            mesh2Name: file2.name
+          }
+        });
       } catch (error) {
-        console.error('Error processing files:', error);
+        console.error('Error navigating:', error);
         alert('Error processing files. Please try again.');
       }
     } else {

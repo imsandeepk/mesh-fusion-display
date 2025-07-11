@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import { Button } from '@/components/ui/button';
@@ -11,35 +11,33 @@ import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
 interface MeshComponentProps {
-  data: string;
+  file: File | null;
   color: string;
   visible: boolean;
   position?: [number, number, number];
 }
 
-const MeshComponent: React.FC<MeshComponentProps> = ({ data, color, visible, position = [0, 0, 0] }) => {
+const MeshComponent: React.FC<MeshComponentProps> = ({ file, color, visible, position = [0, 0, 0] }) => {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
 
   useEffect(() => {
-    if (!data) return;
+    if (!file) return;
 
-    try {
-      const loader = new STLLoader();
-      // Convert base64 back to ArrayBuffer
-      const binaryString = atob(data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+    const loader = new STLLoader();
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const arrayBuffer = event.target.result as ArrayBuffer;
+        const geometry = loader.parse(arrayBuffer);
+        geometry.computeBoundingBox();
+        geometry.center();
+        setGeometry(geometry);
       }
-      
-      const geometry = loader.parse(bytes.buffer);
-      geometry.computeBoundingBox();
-      geometry.center();
-      setGeometry(geometry);
-    } catch (error) {
-      console.error('Error loading mesh:', error);
-    }
-  }, [data]);
+    };
+    
+    reader.readAsArrayBuffer(file);
+  }, [file]);
 
   if (!geometry || !visible) return null;
 
@@ -66,10 +64,11 @@ const CoordinateMarker: React.FC<CoordinateMarkerProps> = ({ position, color = '
 
 const Viewer: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [mesh1Visible, setMesh1Visible] = useState(true);
   const [mesh2Visible, setMesh2Visible] = useState(true);
-  const [mesh1Data, setMesh1Data] = useState<string>('');
-  const [mesh2Data, setMesh2Data] = useState<string>('');
+  const [file1, setFile1] = useState<File | null>(null);
+  const [file2, setFile2] = useState<File | null>(null);
   const [mesh1Name, setMesh1Name] = useState<string>('');
   const [mesh2Name, setMesh2Name] = useState<string>('');
   const [showGrid, setShowGrid] = useState(true);
@@ -85,35 +84,28 @@ const Viewer: React.FC = () => {
   ] as [number, number, number][];
 
   useEffect(() => {
-    const mesh1 = sessionStorage.getItem('mesh1');
-    const mesh2 = sessionStorage.getItem('mesh2');
-    const name1 = sessionStorage.getItem('mesh1Name') || 'Mesh 1';
-    const name2 = sessionStorage.getItem('mesh2Name') || 'Mesh 2';
+    const state = location.state as {
+      file1: File;
+      file2: File;
+      mesh1Name: string;
+      mesh2Name: string;
+    };
     
-    console.log('Loading viewer with data:', { 
-      hasMesh1: !!mesh1, 
-      hasMesh2: !!mesh2, 
-      name1, 
-      name2 
-    });
+    console.log('Viewer state:', state);
     
-    if (!mesh1 || !mesh2) {
-      console.log('Missing mesh data, redirecting to upload');
+    if (!state?.file1 || !state?.file2) {
+      console.log('Missing file data, redirecting to upload');
       navigate('/');
       return;
     }
     
-    setMesh1Data(mesh1);
-    setMesh2Data(mesh2);
-    setMesh1Name(name1);
-    setMesh2Name(name2);
-  }, [navigate]);
+    setFile1(state.file1);
+    setFile2(state.file2);
+    setMesh1Name(state.mesh1Name || 'Mesh 1');
+    setMesh2Name(state.mesh2Name || 'Mesh 2');
+  }, [navigate, location.state]);
 
   const handleBackToUpload = () => {
-    sessionStorage.removeItem('mesh1');
-    sessionStorage.removeItem('mesh2');
-    sessionStorage.removeItem('mesh1Name');
-    sessionStorage.removeItem('mesh2Name');
     navigate('/');
   };
 
@@ -228,13 +220,13 @@ const Viewer: React.FC = () => {
 
           {/* Meshes */}
           <MeshComponent
-            data={mesh1Data}
+            file={file1}
             color="#3b82f6"
             visible={mesh1Visible}
             position={[-2, 0, 0]}
           />
           <MeshComponent
-            data={mesh2Data}
+            file={file2}
             color="#10b981"
             visible={mesh2Visible}
             position={[2, 0, 0]}
