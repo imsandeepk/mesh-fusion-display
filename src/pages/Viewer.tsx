@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Eye, EyeOff, Settings } from 'lucide-react';
+import { ArrowLeft, Settings } from 'lucide-react';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
@@ -70,6 +70,8 @@ const Viewer: React.FC = () => {
   const [mesh2Visible, setMesh2Visible] = useState(true);
   const [mesh1Data, setMesh1Data] = useState<string>('');
   const [mesh2Data, setMesh2Data] = useState<string>('');
+  const [mesh1Name, setMesh1Name] = useState<string>('');
+  const [mesh2Name, setMesh2Name] = useState<string>('');
   const [showGrid, setShowGrid] = useState(true);
   const [panelOpen, setPanelOpen] = useState(true);
 
@@ -85,14 +87,26 @@ const Viewer: React.FC = () => {
   useEffect(() => {
     const mesh1 = sessionStorage.getItem('mesh1');
     const mesh2 = sessionStorage.getItem('mesh2');
+    const name1 = sessionStorage.getItem('mesh1Name') || 'Mesh 1';
+    const name2 = sessionStorage.getItem('mesh2Name') || 'Mesh 2';
+    
+    console.log('Loading viewer with data:', { 
+      hasMesh1: !!mesh1, 
+      hasMesh2: !!mesh2, 
+      name1, 
+      name2 
+    });
     
     if (!mesh1 || !mesh2) {
+      console.log('Missing mesh data, redirecting to upload');
       navigate('/');
       return;
     }
     
     setMesh1Data(mesh1);
     setMesh2Data(mesh2);
+    setMesh1Name(name1);
+    setMesh2Name(name2);
   }, [navigate]);
 
   const handleBackToUpload = () => {
@@ -129,7 +143,7 @@ const Viewer: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm flex items-center gap-2">
                     <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                    Mesh 1
+                    {mesh1Name}
                   </span>
                   <Switch
                     checked={mesh1Visible}
@@ -139,7 +153,7 @@ const Viewer: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm flex items-center gap-2">
                     <div className="w-3 h-3 bg-green-500 rounded"></div>
-                    Mesh 2
+                    {mesh2Name}
                   </span>
                   <Switch
                     checked={mesh2Visible}
