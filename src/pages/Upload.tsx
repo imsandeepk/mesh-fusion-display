@@ -169,9 +169,9 @@ const Upload: React.FC = () => {
         const arrayBuffer1 = await file1.arrayBuffer();
         const arrayBuffer2 = await file2.arrayBuffer();
         
-        // Store as base64 in sessionStorage (temporary solution)
+        // Convert to base64 for storage
         const base64_1 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer1)));
-        const base64_2 = btoa(String.fromCharArray(...new Uint8Array(arrayBuffer2)));
+        const base64_2 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer2)));
         
         sessionStorage.setItem('mesh1', base64_1);
         sessionStorage.setItem('mesh2', base64_2);
