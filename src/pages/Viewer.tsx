@@ -17,6 +17,12 @@ interface MeshComponentProps {
   position?: [number, number, number];
 }
 
+function getColorByIndex(index: number) {
+  const hue = (index * 137.5) % 360; // golden angle for good distribution
+  return `hsl(${hue}, 90%, 60%)`;
+}
+
+
 const extractCenters = (data: any): [number, number, number][] => {
   if (!data || !data.mesh1 || !data.mesh1.centers) return [];
 
@@ -92,44 +98,66 @@ const Viewer: React.FC = () => {
   const [showGrid, setShowGrid] = useState(true);
   const [panelOpen, setPanelOpen] = useState(true);
   const [apiData, setApiData] = useState<any>(null);
-  const [coordinates, setCoordinates] = useState<[number, number, number][]>([]);
+  const [coordinates, setCoordinates] = useState<
+  { pos: [number, number, number]; num: number; color: string; source: string }[]
+>([]);
+
 
 
   // Sample coordinates for markers
 
   useEffect(() => {
-    const state = location.state as {
-      file1: File;
-      file2: File;
-      mesh1Name: string;
-      mesh2Name: string;
-      apiData?: any;
-    };
-    
-    console.log('Viewer state:', state);
-    
-    if (!state?.file1 || !state?.file2) {
-      console.log('Missing file data, redirecting to upload');
-      navigate('/');
-      return;
-    }
-    
-    setFile1(state.file1);
-    setFile2(state.file2);
-    setApiData(state.apiData || null);
-    setMesh1Name(state.mesh1Name || 'Mesh 1');
-    setMesh2Name(state.mesh2Name || 'Mesh 2');
-    const mesh1Centers = Object.values(state.apiData?.mesh1?.centers || {}).map(
-    (entry: any) => entry.center as [number, number, number]
-  );
+  const state = location.state as {
+    file1: File;
+    file2: File;
+    mesh1Name: string;
+    mesh2Name: string;
+    apiData?: any;
+  };
 
-  const mesh2Centers = Object.values(state.apiData?.mesh2?.centers || {}).map(
-    (entry: any) => entry.center as [number, number, number]
-  );
+  if (!state?.file1 || !state?.file2) {
+    navigate('/');
+    return;
+  }
 
-  setCoordinates([...mesh1Centers, ...mesh2Centers]);
-    
-  }, [navigate, location.state]);
+  setFile1(state.file1);
+  setFile2(state.file2);
+  setApiData(state.apiData || null);
+  setMesh1Name(state.mesh1Name || 'Mesh 1');
+  setMesh2Name(state.mesh2Name || 'Mesh 2');
+
+  type CenterEntry = {
+  center: [number, number, number];
+  num: number;
+};
+
+const mesh1Data = state.apiData?.mesh1?.centers as Record<string, CenterEntry> || {};
+const mesh2Data = state.apiData?.mesh2?.centers as Record<string, CenterEntry> || {};
+
+const mesh1Entries = Object.entries(mesh1Data);
+const mesh2Entries = Object.entries(mesh2Data);
+
+const mesh1Coords = mesh1Entries.map(([id, entry], index) => ({
+  pos: entry.center,
+  num: entry.num,
+  color: getColorByIndex(index),
+  source: 'mesh1',
+}));
+
+const mesh2Coords = mesh2Entries.map(([id, entry], index) => ({
+  pos: entry.center,
+  num: entry.num,
+  color: getColorByIndex(mesh1Coords.length + index),
+  source: 'mesh2',
+}));
+
+setCoordinates([...mesh1Coords, ...mesh2Coords]);
+
+
+}, [navigate, location.state]);
+
+
+
 
   const handleBackToUpload = () => {
     navigate('/');
@@ -194,14 +222,19 @@ const Viewer: React.FC = () => {
 
             <Card className="p-4 bg-gray-700 border-gray-600">
               <h3 className="text-sm font-medium mb-4 text-gray-200">Coordinate Markers</h3>
-              <div className="text-xs text-gray-400 space-y-1">
-                {coordinates.map((coord, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                    ({coord[0]}, {coord[1]}, {coord[2]})
-                  </div>
-                ))}
-              </div>
+              <div className="mt-2 overflow-y-auto max-h-[80vh]">
+  {coordinates.map((coord, index) => (
+    <div key={index} className="flex items-center space-x-2 p-2 border-b border-gray-200">
+      <div
+        className="w-3 h-3 rounded-full"
+        style={{ backgroundColor: coord.color }}
+      />
+      <span className="text-sm font-medium">
+       {coord.source.toUpperCase()} - Num: {coord.num}
+      </span>
+    </div>
+  ))}
+</div>
             </Card>
           </div>
         )}
@@ -250,25 +283,27 @@ const Viewer: React.FC = () => {
           {/* Meshes */}
           <MeshComponent
             file={file1}
-            color="#3b82f6"
+            color="#FFFFE3"
             visible={mesh1Visible}
             position={[-2, 0, 0]}
           />
           <MeshComponent
             file={file2}
-            color="#10b981"
+            color="#FFFFE3"
             visible={mesh2Visible}
             position={[2, 0, 0]}
           />
 
           {/* Coordinate Markers */}
-          {coordinates.map((position, index) => (
-            <CoordinateMarker
-              key={index}
-              position={position}
-              color="#ef4444"
-            />
-          ))}
+          {coordinates
+  .filter((coord) =>
+    (coord.source === 'mesh1' && mesh1Visible) ||
+    (coord.source === 'mesh2' && mesh2Visible)
+  )
+  .map((coord, index) => (
+    <CoordinateMarker key={index} position={coord.pos} color={coord.color} />
+))}
+
 
           <OrbitControls
             enablePan={true}
