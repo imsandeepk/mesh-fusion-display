@@ -31,7 +31,6 @@ const MeshComponent: React.FC<MeshComponentProps> = ({ file, color, visible, pos
         const arrayBuffer = event.target.result as ArrayBuffer;
         const geometry = loader.parse(arrayBuffer);
         geometry.computeBoundingBox();
-        geometry.center();
         setGeometry(geometry);
       }
     };
@@ -42,8 +41,19 @@ const MeshComponent: React.FC<MeshComponentProps> = ({ file, color, visible, pos
   if (!geometry || !visible) return null;
 
   return (
-    <mesh geometry={geometry} position={position}>
-      <meshStandardMaterial color={color} side={THREE.DoubleSide} />
+    <mesh
+  geometry={geometry}
+  position={position}
+  castShadow
+  receiveShadow
+>
+      <meshStandardMaterial
+  color={color}
+  metalness={0.3}
+  roughness={0.2}
+  emissive={new THREE.Color(color).multiplyScalar(0.1)}
+  side={THREE.DoubleSide}
+/>
     </mesh>
   );
 };
@@ -56,7 +66,7 @@ interface CoordinateMarkerProps {
 const CoordinateMarker: React.FC<CoordinateMarkerProps> = ({ position, color = '#ff6b6b' }) => {
   return (
     <mesh position={position}>
-      <sphereGeometry args={[0.1, 16, 16]} />
+      <sphereGeometry args={[0.5, 16, 16]} />
       <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
     </mesh>
   );
@@ -76,12 +86,19 @@ const Viewer: React.FC = () => {
 
   // Sample coordinates for markers
   const coordinates = [
-    [2, 2, 0],
-    [-2, 2, 0],
-    [0, -2, 1],
-    [3, 0, -1],
-    [-1, 3, 2]
-  ] as [number, number, number][];
+  [13.972716013590496, 28.874358495076496, -7.2957695325215655],
+  [17.147003809611004, 22.4296137491862, -6.625541845957439],
+  [-27.87714258829753, 14.992266654968262, -8.217494010925293],
+  [9.96170425415039, 35.24715805053711, -9.481896082560223],
+  [-12.27313009897868, 39.499619801839195, -9.315000851949057],
+  [-3.460191011428833, 41.300444285074875, -9.04151217142741],
+  [4.280679861704509, 39.128387451171875, -8.016834894816082],
+  [-17.52207056681315, 35.32466125488281, -8.93694845835368],
+  [-29.31557909647624, 5.085844039916992, -7.397113641103109],
+  [-24.06572723388672, 31.36399714152018, -6.939029852549235],
+  [-25.735349655151367, 23.512896855672203, -5.105265458424887],
+  [20.77125358581543, 15.68517812093099, -6.6283787091573085]
+] as [number, number, number][];
 
   useEffect(() => {
     const state = location.state as {
@@ -196,12 +213,15 @@ const Viewer: React.FC = () => {
       {/* 3D Viewer */}
       <div className="flex-1 relative">
         <Canvas
+          shadows
           camera={{ position: [10, 10, 10], fov: 50 }}
           className="bg-gradient-to-b from-gray-900 to-black"
         >
           <ambientLight intensity={0.4} />
-          <directionalLight position={[10, 10, 5]} intensity={1} />
-          <pointLight position={[-10, -10, -10]} intensity={0.3} />
+<directionalLight position={[10, 15, 10]} intensity={1} castShadow />
+<directionalLight position={[-10, -15, -10]} intensity={0.5} castShadow />
+<pointLight position={[5, -10, 5]} intensity={0.5} />
+<pointLight position={[-10, 10, -5]} intensity={0.3} />
           
           {/* Grid */}
           {showGrid && (
@@ -245,8 +265,8 @@ const Viewer: React.FC = () => {
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
-            maxDistance={50}
-            minDistance={2}
+            maxDistance={100}
+            minDistance={0.1}
           />
         </Canvas>
 
