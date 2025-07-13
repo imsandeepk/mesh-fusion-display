@@ -11,22 +11,44 @@ const Upload: React.FC = () => {
   const navigate = useNavigate();
   const [file1, setFile1] = useState<File | null>(null);
   const [file2, setFile2] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     if (file1 && file2) {
+      setIsSubmitting(true);
       try {
-        console.log('Navigating to viewer with files:', file1.name, file2.name);
+        console.log('Submitting files to API:', file1.name, file2.name);
+        
+        const formData = new FormData();
+        formData.append('file1', file1);
+        formData.append('file2', file2);
+
+        const response = await fetch('http://34.134.57.141:8000', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const apiData = await response.json();
+        console.log('API Response:', apiData);
+
         navigate('/viewer', {
           state: {
             file1: file1,
             file2: file2,
             mesh1Name: file1.name,
-            mesh2Name: file2.name
+            mesh2Name: file2.name,
+            apiData: apiData
           }
         });
       } catch (error) {
-        console.error('Error navigating:', error);
+        console.error('Error submitting files:', error);
         alert('Error processing files. Please try again.');
+      } finally {
+        setIsSubmitting(false);
       }
     } else {
       alert('Please upload both STL files before proceeding.');
@@ -81,11 +103,11 @@ const Upload: React.FC = () => {
         <div className="text-center">
           <Button
             onClick={handleSubmit}
-            disabled={!file1 || !file2}
+            disabled={!file1 || !file2 || isSubmitting}
             size="lg"
             className="px-8 py-3 text-lg"
           >
-            View Meshes
+            {isSubmitting ? 'Processing...' : 'Submit'}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </div>

@@ -2,13 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid } from '@react-three/drei';
+import { Grid } from '@react-three/drei';
+import { TrackballControls } from '@react-three/drei';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Settings } from 'lucide-react';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import CoordinateMarkers from '@/components/CoordinateMarkers';
+import CoordinateLegend from '@/components/CoordinateLegend';
 
 interface MeshComponentProps {
   file: File | null;
@@ -42,35 +45,39 @@ const MeshComponent: React.FC<MeshComponentProps> = ({ file, color, visible, pos
 
   return (
     <mesh
-  geometry={geometry}
-  position={position}
-  castShadow
-  receiveShadow
->
+      geometry={geometry}
+      position={position}
+      castShadow
+      receiveShadow
+    >
       <meshStandardMaterial
-  color={color}
-  metalness={0.3}
-  roughness={0.2}
-  emissive={new THREE.Color(color).multiplyScalar(0.1)}
-  side={THREE.DoubleSide}
-/>
+        color={color}
+        metalness={0.3}
+        roughness={0.2}
+        emissive={new THREE.Color(color).multiplyScalar(0.1)}
+        side={THREE.DoubleSide}
+      />
     </mesh>
   );
 };
 
-interface CoordinateMarkerProps {
-  position: [number, number, number];
-  color?: string;
+interface MarkerData {
+  prep: number;
+  num: number;
+  center: [number, number, number];
 }
 
-const CoordinateMarker: React.FC<CoordinateMarkerProps> = ({ position, color = '#ff6b6b' }) => {
-  return (
-    <mesh position={position}>
-      <sphereGeometry args={[0.5, 16, 16]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
-    </mesh>
-  );
-};
+interface ApiData {
+  mesh1: {
+    is_lower: boolean;
+    centers: Record<string, MarkerData>;
+  };
+  mesh2: {
+    is_lower: boolean;
+    centers: Record<string, MarkerData>;
+  };
+  id: string;
+}
 
 const Viewer: React.FC = () => {
   const navigate = useNavigate();
@@ -83,22 +90,7 @@ const Viewer: React.FC = () => {
   const [mesh2Name, setMesh2Name] = useState<string>('');
   const [showGrid, setShowGrid] = useState(true);
   const [panelOpen, setPanelOpen] = useState(true);
-
-  // Sample coordinates for markers
-  const coordinates = [
-  [13.972716013590496, 28.874358495076496, -7.2957695325215655],
-  [17.147003809611004, 22.4296137491862, -6.625541845957439],
-  [-27.87714258829753, 14.992266654968262, -8.217494010925293],
-  [9.96170425415039, 35.24715805053711, -9.481896082560223],
-  [-12.27313009897868, 39.499619801839195, -9.315000851949057],
-  [-3.460191011428833, 41.300444285074875, -9.04151217142741],
-  [4.280679861704509, 39.128387451171875, -8.016834894816082],
-  [-17.52207056681315, 35.32466125488281, -8.93694845835368],
-  [-29.31557909647624, 5.085844039916992, -7.397113641103109],
-  [-24.06572723388672, 31.36399714152018, -6.939029852549235],
-  [-25.735349655151367, 23.512896855672203, -5.105265458424887],
-  [20.77125358581543, 15.68517812093099, -6.6283787091573085]
-] as [number, number, number][];
+  const [apiData, setApiData] = useState<ApiData | null>(null);
 
   useEffect(() => {
     const state = location.state as {
@@ -106,6 +98,7 @@ const Viewer: React.FC = () => {
       file2: File;
       mesh1Name: string;
       mesh2Name: string;
+      apiData?: ApiData;
     };
     
     console.log('Viewer state:', state);
@@ -120,6 +113,10 @@ const Viewer: React.FC = () => {
     setFile2(state.file2);
     setMesh1Name(state.mesh1Name || 'Mesh 1');
     setMesh2Name(state.mesh2Name || 'Mesh 2');
+    
+    if (state.apiData) {
+      setApiData(state.apiData);
+    }
   }, [navigate, location.state]);
 
   const handleBackToUpload = () => {
@@ -145,7 +142,7 @@ const Viewer: React.FC = () => {
         </div>
         
         {panelOpen && (
-          <div className="flex-1 p-4 space-y-6">
+          <div className="flex-1 p-4 space-y-6 overflow-y-auto">
             <Card className="p-4 bg-gray-700 border-gray-600">
               <h3 className="text-sm font-medium mb-4 text-gray-200">Mesh Visibility</h3>
               <div className="space-y-3">
@@ -183,17 +180,14 @@ const Viewer: React.FC = () => {
               </div>
             </Card>
 
-            <Card className="p-4 bg-gray-700 border-gray-600">
-              <h3 className="text-sm font-medium mb-4 text-gray-200">Coordinate Markers</h3>
-              <div className="text-xs text-gray-400 space-y-1">
-                {coordinates.map((coord, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                    ({coord[0]}, {coord[1]}, {coord[2]})
-                  </div>
-                ))}
-              </div>
-            </Card>
+            {apiData && (
+              <CoordinateLegend
+                mesh1Centers={apiData.mesh1.centers}
+                mesh2Centers={apiData.mesh2.centers}
+                mesh1Name={mesh1Name}
+                mesh2Name={mesh2Name}
+              />
+            )}
           </div>
         )}
 
@@ -218,10 +212,10 @@ const Viewer: React.FC = () => {
           className="bg-gradient-to-b from-gray-900 to-black"
         >
           <ambientLight intensity={0.4} />
-<directionalLight position={[10, 15, 10]} intensity={1} castShadow />
-<directionalLight position={[-10, -15, -10]} intensity={0.5} castShadow />
-<pointLight position={[5, -10, 5]} intensity={0.5} />
-<pointLight position={[-10, 10, -5]} intensity={0.3} />
+          <directionalLight position={[10, 15, 10]} intensity={1} castShadow />
+          <directionalLight position={[-10, -15, -10]} intensity={0.5} castShadow />
+          <pointLight position={[5, -10, 5]} intensity={0.5} />
+          <pointLight position={[-10, 10, -5]} intensity={0.3} />
           
           {/* Grid */}
           {showGrid && (
@@ -252,21 +246,29 @@ const Viewer: React.FC = () => {
             position={[2, 0, 0]}
           />
 
-          {/* Coordinate Markers */}
-          {coordinates.map((position, index) => (
-            <CoordinateMarker
-              key={index}
-              position={position}
-              color="#ef4444"
-            />
-          ))}
+          {/* Coordinate Markers from API */}
+          {apiData && (
+            <>
+              <CoordinateMarkers 
+                centers={apiData.mesh1.centers} 
+                meshName="mesh1" 
+              />
+              <CoordinateMarkers 
+                centers={apiData.mesh2.centers} 
+                meshName="mesh2" 
+              />
+            </>
+          )}
 
-          <OrbitControls
+          <TrackballControls
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
             maxDistance={100}
             minDistance={0.1}
+            panSpeed={0.8}
+            rotateSpeed={1.0}
+            zoomSpeed={1.2}
           />
         </Canvas>
 
