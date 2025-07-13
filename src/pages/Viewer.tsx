@@ -1,17 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
-import { Grid } from '@react-three/drei';
-import { TrackballControls } from '@react-three/drei';
+import { OrbitControls, Grid } from '@react-three/drei';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Settings } from 'lucide-react';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import CoordinateMarkers from '@/components/CoordinateMarkers';
-import CoordinateLegend from '@/components/CoordinateLegend';
 
 interface MeshComponentProps {
   file: File | null;
@@ -19,6 +16,14 @@ interface MeshComponentProps {
   visible: boolean;
   position?: [number, number, number];
 }
+
+const extractCenters = (data: any): [number, number, number][] => {
+  if (!data || !data.mesh1 || !data.mesh1.centers) return [];
+
+  const centers = Object.values(data.mesh1.centers) as any[];
+  return centers.map((entry) => entry.center as [number, number, number]);
+};
+
 
 const MeshComponent: React.FC<MeshComponentProps> = ({ file, color, visible, position = [0, 0, 0] }) => {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
@@ -45,39 +50,35 @@ const MeshComponent: React.FC<MeshComponentProps> = ({ file, color, visible, pos
 
   return (
     <mesh
-      geometry={geometry}
-      position={position}
-      castShadow
-      receiveShadow
-    >
+  geometry={geometry}
+  position={position}
+  castShadow
+  receiveShadow
+>
       <meshStandardMaterial
-        color={color}
-        metalness={0.3}
-        roughness={0.2}
-        emissive={new THREE.Color(color).multiplyScalar(0.1)}
-        side={THREE.DoubleSide}
-      />
+  color={color}
+  metalness={0.3}
+  roughness={0.2}
+  emissive={new THREE.Color(color).multiplyScalar(0.1)}
+  side={THREE.DoubleSide}
+/>
     </mesh>
   );
 };
 
-interface MarkerData {
-  prep: number;
-  num: number;
-  center: [number, number, number];
+interface CoordinateMarkerProps {
+  position: [number, number, number];
+  color?: string;
 }
 
-interface ApiData {
-  mesh1: {
-    is_lower: boolean;
-    centers: Record<string, MarkerData>;
-  };
-  mesh2: {
-    is_lower: boolean;
-    centers: Record<string, MarkerData>;
-  };
-  id: string;
-}
+const CoordinateMarker: React.FC<CoordinateMarkerProps> = ({ position, color = '#ff6b6b' }) => {
+  return (
+    <mesh position={position}>
+      <sphereGeometry args={[0.5, 16, 16]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
+    </mesh>
+  );
+};
 
 const Viewer: React.FC = () => {
   const navigate = useNavigate();
@@ -90,7 +91,11 @@ const Viewer: React.FC = () => {
   const [mesh2Name, setMesh2Name] = useState<string>('');
   const [showGrid, setShowGrid] = useState(true);
   const [panelOpen, setPanelOpen] = useState(true);
-  const [apiData, setApiData] = useState<ApiData | null>(null);
+  const [apiData, setApiData] = useState<any>(null);
+  const [coordinates, setCoordinates] = useState<[number, number, number][]>([]);
+
+
+  // Sample coordinates for markers
 
   useEffect(() => {
     const state = location.state as {
@@ -98,7 +103,7 @@ const Viewer: React.FC = () => {
       file2: File;
       mesh1Name: string;
       mesh2Name: string;
-      apiData?: ApiData;
+      apiData?: any;
     };
     
     console.log('Viewer state:', state);
@@ -111,12 +116,19 @@ const Viewer: React.FC = () => {
     
     setFile1(state.file1);
     setFile2(state.file2);
+    setApiData(state.apiData || null);
     setMesh1Name(state.mesh1Name || 'Mesh 1');
     setMesh2Name(state.mesh2Name || 'Mesh 2');
+    const mesh1Centers = Object.values(state.apiData?.mesh1?.centers || {}).map(
+    (entry: any) => entry.center as [number, number, number]
+  );
+
+  const mesh2Centers = Object.values(state.apiData?.mesh2?.centers || {}).map(
+    (entry: any) => entry.center as [number, number, number]
+  );
+
+  setCoordinates([...mesh1Centers, ...mesh2Centers]);
     
-    if (state.apiData) {
-      setApiData(state.apiData);
-    }
   }, [navigate, location.state]);
 
   const handleBackToUpload = () => {
@@ -142,7 +154,7 @@ const Viewer: React.FC = () => {
         </div>
         
         {panelOpen && (
-          <div className="flex-1 p-4 space-y-6 overflow-y-auto">
+          <div className="flex-1 p-4 space-y-6">
             <Card className="p-4 bg-gray-700 border-gray-600">
               <h3 className="text-sm font-medium mb-4 text-gray-200">Mesh Visibility</h3>
               <div className="space-y-3">
@@ -180,14 +192,17 @@ const Viewer: React.FC = () => {
               </div>
             </Card>
 
-            {apiData && (
-              <CoordinateLegend
-                mesh1Centers={apiData.mesh1.centers}
-                mesh2Centers={apiData.mesh2.centers}
-                mesh1Name={mesh1Name}
-                mesh2Name={mesh2Name}
-              />
-            )}
+            <Card className="p-4 bg-gray-700 border-gray-600">
+              <h3 className="text-sm font-medium mb-4 text-gray-200">Coordinate Markers</h3>
+              <div className="text-xs text-gray-400 space-y-1">
+                {coordinates.map((coord, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                    ({coord[0]}, {coord[1]}, {coord[2]})
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
         )}
 
@@ -212,10 +227,10 @@ const Viewer: React.FC = () => {
           className="bg-gradient-to-b from-gray-900 to-black"
         >
           <ambientLight intensity={0.4} />
-          <directionalLight position={[10, 15, 10]} intensity={1} castShadow />
-          <directionalLight position={[-10, -15, -10]} intensity={0.5} castShadow />
-          <pointLight position={[5, -10, 5]} intensity={0.5} />
-          <pointLight position={[-10, 10, -5]} intensity={0.3} />
+<directionalLight position={[10, 15, 10]} intensity={1} castShadow />
+<directionalLight position={[-10, -15, -10]} intensity={0.5} castShadow />
+<pointLight position={[5, -10, 5]} intensity={0.5} />
+<pointLight position={[-10, 10, -5]} intensity={0.3} />
           
           {/* Grid */}
           {showGrid && (
@@ -246,29 +261,21 @@ const Viewer: React.FC = () => {
             position={[2, 0, 0]}
           />
 
-          {/* Coordinate Markers from API */}
-          {apiData && (
-            <>
-              <CoordinateMarkers 
-                centers={apiData.mesh1.centers} 
-                meshName="mesh1" 
-              />
-              <CoordinateMarkers 
-                centers={apiData.mesh2.centers} 
-                meshName="mesh2" 
-              />
-            </>
-          )}
+          {/* Coordinate Markers */}
+          {coordinates.map((position, index) => (
+            <CoordinateMarker
+              key={index}
+              position={position}
+              color="#ef4444"
+            />
+          ))}
 
-          <TrackballControls
+          <OrbitControls
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
             maxDistance={100}
             minDistance={0.1}
-            panSpeed={0.8}
-            rotateSpeed={1.0}
-            zoomSpeed={1.2}
           />
         </Canvas>
 
