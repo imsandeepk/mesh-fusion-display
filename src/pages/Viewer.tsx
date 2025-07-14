@@ -22,6 +22,28 @@ function getColorByIndex(index: number) {
   return `hsl(${hue}, 90%, 60%)`;
 }
 
+function mapToothNumberToFDI(input: number, ul_bool: boolean): number {
+  const mapping: { [key: number]: number } = {};
+
+  if (ul_bool) {
+    for (let i = 0; i < 8; i++) {
+      mapping[i] = i === 0 ? 0 : 40 + i;
+    }
+    for (let i = 8; i < 15; i++) {
+      mapping[i] = 23 + i; // 8:41, ..., 14:47
+    }
+  } else {
+    for (let i = 0; i < 8; i++) {
+      mapping[i] = i === 0 ? 0 : 20 + i;
+    }
+    for (let i = 8; i < 15; i++) {
+      mapping[i] = 3 + i; // 8:21, ..., 14:27
+    }
+  }
+
+  return mapping[input] ?? input;
+}
+
 
 const extractCenters = (data: any): [number, number, number][] => {
   if (!data || !data.mesh1 || !data.mesh1.centers) return [];
@@ -75,12 +97,17 @@ const MeshComponent: React.FC<MeshComponentProps> = ({ file, color, visible, pos
 interface CoordinateMarkerProps {
   position: [number, number, number];
   color?: string;
+  size?: number;
 }
 
-const CoordinateMarker: React.FC<CoordinateMarkerProps> = ({ position, color = '#ff6b6b' }) => {
+const CoordinateMarker: React.FC<CoordinateMarkerProps> = ({
+  position,
+  color = '#ff6b6b',
+  size = 0.5,
+}) => {
   return (
     <mesh position={position}>
-      <sphereGeometry args={[0.5, 16, 16]} />
+      <sphereGeometry args={[size, 16, 16]} />
       <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
     </mesh>
   );
@@ -99,8 +126,9 @@ const Viewer: React.FC = () => {
   const [panelOpen, setPanelOpen] = useState(true);
   const [apiData, setApiData] = useState<any>(null);
   const [coordinates, setCoordinates] = useState<
-  { pos: [number, number, number]; num: number; color: string; source: string }[]
+  { pos: [number, number, number]; num: number; prep: number; color: string; source: string }[]
 >([]);
+
 
 
 
@@ -129,7 +157,10 @@ const Viewer: React.FC = () => {
   type CenterEntry = {
   center: [number, number, number];
   num: number;
+  prep: number; // 👈 Add this line
+  is_lower: boolean; // Optional, if needed
 };
+
 
 const mesh1Data = state.apiData?.mesh1?.centers as Record<string, CenterEntry> || {};
 const mesh2Data = state.apiData?.mesh2?.centers as Record<string, CenterEntry> || {};
@@ -139,7 +170,8 @@ const mesh2Entries = Object.entries(mesh2Data);
 
 const mesh1Coords = mesh1Entries.map(([id, entry], index) => ({
   pos: entry.center,
-  num: entry.num,
+  num: mapToothNumberToFDI(entry.num,entry.is_lower),
+  prep: entry.prep,
   color: getColorByIndex(index),
   source: 'mesh1',
 }));
@@ -147,9 +179,11 @@ const mesh1Coords = mesh1Entries.map(([id, entry], index) => ({
 const mesh2Coords = mesh2Entries.map(([id, entry], index) => ({
   pos: entry.center,
   num: entry.num,
+  prep: entry.prep,
   color: getColorByIndex(mesh1Coords.length + index),
   source: 'mesh2',
 }));
+
 
 setCoordinates([...mesh1Coords, ...mesh2Coords]);
 
@@ -301,8 +335,14 @@ setCoordinates([...mesh1Coords, ...mesh2Coords]);
     (coord.source === 'mesh2' && mesh2Visible)
   )
   .map((coord, index) => (
-    <CoordinateMarker key={index} position={coord.pos} color={coord.color} />
+    <CoordinateMarker
+      key={index}
+      position={coord.pos}
+      color={coord.color}
+      size={coord.prep === 1 ? 1.2 : 0.5} // Larger for prep === 1
+    />
 ))}
+
 
 
           <OrbitControls
