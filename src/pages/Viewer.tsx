@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect,useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
@@ -10,16 +9,22 @@ import { ArrowLeft, Settings } from 'lucide-react';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
+const colorMap = {
+  '1': '#ff0000', // red
+  '2': '#00ff00', // green
+  '3': '#0000ff', // blue
+  '4': '#ffff00', // yellow
+  '5': '#ffa500', // orange
+  '6': '#800080', // purple
+  '7': '#00ffff', // cyan
+  '8': '#ffc0cb'  // pink
+};
+
 interface MeshComponentProps {
   file: File | null;
   color: string;
   visible: boolean;
   position?: [number, number, number];
-}
-
-function getColorByIndex(index: number) {
-  const hue = (index * 137.5) % 360; // golden angle for good distribution
-  return `hsl(${hue}, 90%, 60%)`;
 }
 
 function mapToothNumberToFDI(input: number, ul_bool: boolean): number {
@@ -44,14 +49,12 @@ function mapToothNumberToFDI(input: number, ul_bool: boolean): number {
   return mapping[input] ?? input;
 }
 
-
 const extractCenters = (data: any): [number, number, number][] => {
   if (!data || !data.mesh1 || !data.mesh1.centers) return [];
 
   const centers = Object.values(data.mesh1.centers) as any[];
   return centers.map((entry) => entry.center as [number, number, number]);
 };
-
 
 const MeshComponent: React.FC<MeshComponentProps> = ({ file, color, visible, position = [0, 0, 0] }) => {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
@@ -79,7 +82,6 @@ const MeshComponent: React.FC<MeshComponentProps> = ({ file, color, visible, pos
   return (
     <mesh
   geometry={geometry}
-  position={position}
   castShadow
   receiveShadow
 >
@@ -102,7 +104,7 @@ interface CoordinateMarkerProps {
 
 const CoordinateMarker: React.FC<CoordinateMarkerProps> = ({
   position,
-  color = '#ff6b6b',
+  color = '#ffffff',
   size = 0.5,
 }) => {
   return (
@@ -129,11 +131,6 @@ const Viewer: React.FC = () => {
   { pos: [number, number, number]; num: number; prep: number; color: string; source: string }[]
 >([]);
 
-
-
-
-  // Sample coordinates for markers
-
   useEffect(() => {
   const state = location.state as {
     file1: File;
@@ -157,10 +154,9 @@ const Viewer: React.FC = () => {
   type CenterEntry = {
   center: [number, number, number];
   num: number;
-  prep: number; // 👈 Add this line
-  is_lower: boolean; // Optional, if needed
+  prep: number;
+  is_lower: boolean;
 };
-
 
 const mesh1Data = state.apiData?.mesh1?.centers as Record<string, CenterEntry> || {};
 const mesh2Data = state.apiData?.mesh2?.centers as Record<string, CenterEntry> || {};
@@ -168,30 +164,48 @@ const mesh2Data = state.apiData?.mesh2?.centers as Record<string, CenterEntry> |
 const mesh1Entries = Object.entries(mesh1Data);
 const mesh2Entries = Object.entries(mesh2Data);
 
-const mesh1Coords = mesh1Entries.map(([id, entry], index) => ({
-  pos: entry.center,
-  num: mapToothNumberToFDI(entry.num,entry.is_lower),
-  prep: entry.prep,
-  color: getColorByIndex(index),
-  source: 'mesh1',
-}));
+const mesh2Coords = mesh2Entries
+  .map(([id, entry]) => {
+    const fdiNum = entry.num;
+    const fdiLastDigit = Math.abs(fdiNum) % 10;
+    const colorgiven = colorMap[fdiLastDigit.toString()] || '#AAAAAA';
 
-const mesh2Coords = mesh2Entries.map(([id, entry], index) => ({
-  pos: entry.center,
-  num: entry.num,
-  prep: entry.prep,
-  color: getColorByIndex(mesh1Coords.length + index),
-  source: 'mesh2',
-}));
+    console.log(`Tooth Number (mesh2): ${fdiNum}, Color: ${colorgiven}`);
 
+    return {
+      pos: entry.center,
+      num: fdiNum,
+      prep: entry.prep,
+      color: colorgiven,
+      source: 'mesh2',
+    };
+  })
+  .filter((coord) => coord.num !== -1); // Filter out invalid coordinates
+
+const mesh1Coords = mesh1Entries
+  .map(([id, entry]) => {
+    const fdiNum = mapToothNumberToFDI(entry.num, entry.is_lower);
+    const fdiLastDigit = Math.abs(fdiNum) % 10;
+    const colorgiven = colorMap[fdiLastDigit.toString()] || '#AAAAAA';
+
+    console.log(`Tooth Number: ${entry.num}, FDI: ${fdiNum}, Color: ${colorgiven}`);
+
+    return {
+      pos: entry.center,
+      num: fdiNum,
+      prep: entry.prep,
+      color: colorgiven,
+      source: 'mesh1',
+    };
+  })
+  .filter((coord) => coord.num !== -1); // Filter out invalid coordinates
 
 setCoordinates([...mesh1Coords, ...mesh2Coords]);
 
-
 }, [navigate, location.state]);
 
-
-
+  // Filter coordinates to exclude num === -1 for rendering
+  const validCoordinates = coordinates.filter(coord => coord.num !== -1);
 
   const handleBackToUpload = () => {
     navigate('/');
@@ -257,18 +271,18 @@ setCoordinates([...mesh1Coords, ...mesh2Coords]);
             <Card className="p-4 bg-gray-700 border-gray-600">
               <h3 className="text-sm font-medium mb-4 text-gray-200">Coordinate Markers</h3>
               <div className="mt-2 overflow-y-auto max-h-[80vh]">
-  {coordinates.map((coord, index) => (
-    <div key={index} className="flex items-center space-x-2 p-2 border-b border-gray-200">
-      <div
-        className="w-3 h-3 rounded-full"
-        style={{ backgroundColor: coord.color }}
-      />
-      <span className="text-sm font-medium">
-       {coord.source.toUpperCase()} - Num: {coord.num}
-      </span>
-    </div>
-  ))}
-</div>
+                {validCoordinates.map((coord, index) => (
+                  <div key={index} className="flex items-center space-x-2 p-2 border-b border-gray-600">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: coord.color }}
+                    />
+                    <span className="text-sm font-medium text-gray-300">
+                      {coord.source.toUpperCase()} - Num: {coord.num}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </Card>
           </div>
         )}
@@ -329,21 +343,19 @@ setCoordinates([...mesh1Coords, ...mesh2Coords]);
           />
 
           {/* Coordinate Markers */}
-          {coordinates
-  .filter((coord) =>
-    (coord.source === 'mesh1' && mesh1Visible) ||
-    (coord.source === 'mesh2' && mesh2Visible)
-  )
-  .map((coord, index) => (
-    <CoordinateMarker
-      key={index}
-      position={coord.pos}
-      color={coord.color}
-      size={coord.prep === 1 ? 1.2 : 0.5} // Larger for prep === 1
-    />
-))}
-
-
+          {validCoordinates
+            .filter(coord =>
+              (coord.source === 'mesh1' && mesh1Visible) ||
+              (coord.source === 'mesh2' && mesh2Visible)
+            )
+            .map((coord, index) => (
+              <CoordinateMarker
+                key={index}
+                position={coord.pos}
+                color={coord.color}
+                size={coord.prep === 1 ? 1.2 : 0.5}
+              />
+            ))}
 
           <OrbitControls
             enablePan={true}
